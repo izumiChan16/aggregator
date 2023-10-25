@@ -36,7 +36,7 @@ CTX.check_hostname = False
 CTX.verify_mode = ssl.CERT_NONE
 
 # 从环境变量中获取配置文件的url
-config_url = os.environ.get('CONFIG_URL')
+config_url = "https://cos.izumichan16.cn/xray/config_cos.json"
 
 PATH = os.path.abspath(os.path.dirname(__file__))
 
