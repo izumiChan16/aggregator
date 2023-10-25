@@ -112,11 +112,8 @@ def get_cookie(text) -> str:
 
 
 def config_load(filename) -> dict:
-    config_url = ""
-
     # 从环境变量中获取配置文件的url
-    if "CONFIG_URL" in os.environ:
-        config_url = os.environ["CONFIG_URL"]
+    config_url = os.environ["CONFIG_URL"]
 
     # 通过url获取配置文件
     if config_url != "":
@@ -164,11 +161,6 @@ def wrapper(args) -> bool:
 def main() -> None:
     config = config_load(os.path.join(PATH, "config.json"))
     params = config.get("domains", [])
-    
-    # 如果params为空，则退出程序
-    if not params:
-        print("params is empty")
-        return
 
     cpu_count = multiprocessing.cpu_count()
     num = len(params) if len(params) <= cpu_count else cpu_count
