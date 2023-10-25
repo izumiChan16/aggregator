@@ -118,10 +118,8 @@ def config_load(filename) -> dict:
 
     # 通过url获取配置文件
     if config_url != "":
-        print("config_url is not empty, use config file from url")
         config = json.loads(requests.get(config_url).text)
     else:
-        print("config_url is empty, use local config file")
         config = json.loads(open(filename, "r").read())
     return config
 
