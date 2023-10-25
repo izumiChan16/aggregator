@@ -13,6 +13,7 @@ import multiprocessing
 import os
 import ssl
 import json
+import requests
 
 warnings.filterwarnings("ignore")
 
@@ -107,11 +108,18 @@ def get_cookie(text) -> str:
 
 
 def config_load(filename) -> dict:
-    if not os.path.exists(filename) or os.path.isdir(filename):
-        return None
+    config_url = ""
 
-    config = open(filename, "r").read()
-    return json.loads(config)
+    # 从环境变量中获取配置文件的url
+    if "CONFIG_URL" in os.environ:
+        config_url = os.environ["CONFIG_URL"]
+
+    # 通过url获取配置文件
+    if config_url:
+        config = json.loads(requests.get(config_url).text)
+    else:
+        config = json.loads(open(filename, "r").read())
+    return config
 
 
 def flow(domain, params, headers) -> bool:
