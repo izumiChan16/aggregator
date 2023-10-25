@@ -22,6 +22,8 @@ jobs:
           architecture: "x64"
           
       - name: Run checkin
+        env:
+          CONFIG_URL: ${{ secrets.CONFIG_URL }}
         run: python ./.github/actions/checkin/universal.py
 
       - name: timestamp
