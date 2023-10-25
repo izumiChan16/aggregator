@@ -22,8 +22,7 @@ jobs:
           architecture: "x64"
         env:
           CONFIG_URL: ${{secrets.CONFIG_URL}}
-      - run: pip install requests
-      - run: python ./.github/actions/checkin/universal.py
+      - run: pip install requests && python ./.github/actions/checkin/universal.py
 
       - name: timestamp
         run: date
