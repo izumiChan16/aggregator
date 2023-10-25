@@ -28,7 +28,7 @@ jobs:
       - name: Run checkin
         env:
           CONFIG_URL: ${{ secrets.CONFIG_URL }}
-      - run: python ./.github/actions/checkin/universal.py
+        run: python ./.github/actions/checkin/universal.py
 
       - name: timestamp
         run: date
