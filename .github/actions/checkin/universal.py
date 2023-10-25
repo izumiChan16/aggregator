@@ -113,7 +113,7 @@ def get_cookie(text) -> str:
 
 def config_load(filename) -> dict:
     # 从环境变量中获取配置文件的url
-    config_url = os.environ["CONFIG_URL"]
+    config_url = os.environ.get('SCKEY')
 
     # 通过url获取配置文件
     if config_url != "":
