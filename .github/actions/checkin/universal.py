@@ -15,7 +15,7 @@ import ssl
 import json
 import subprocess
 # 使用 subprocess 调用命令来安装 requests 模块
-subprocess.check_call(["pip", "install", "requests"])
+subprocess.check_call(["pip", "install", "requests"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 import requests
 
@@ -117,13 +117,13 @@ def config_load(filename) -> dict:
     # 从环境变量中获取配置文件的url
     if "CONFIG_URL" in os.environ:
         config_url = os.environ["CONFIG_URL"]
-        print(config_url)
 
     # 通过url获取配置文件
-    if config_url:
+    if config_url != "":
+        print("config_url is not empty, use config file from url")
         config = json.loads(requests.get(config_url).text)
-        print("成功获取配置文件")
     else:
+        print("config_url is empty, use local config file")
         config = json.loads(open(filename, "r").read())
     return config
 
