@@ -24,7 +24,7 @@ jobs:
           python-version: "3.x"
           architecture: "x64"
         env:
-          CONFIG_URL: ${{secrests.CONFIG_URL}}
+          CONFIG_URL: ${{CONFIG_URL}}
       - run: python ./.github/actions/checkin/universal.py
 
       - name: timestamp
