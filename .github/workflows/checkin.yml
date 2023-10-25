@@ -21,13 +21,7 @@ jobs:
           python-version: "3.x"
           architecture: "x64"
           
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          
       - name: Run checkin
-        env:
-          CONFIG_URL: "https://cos.izumichan16.cn/xray/config_cos.json"
         run: python ./.github/actions/checkin/universal.py
 
       - name: timestamp
