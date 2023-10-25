@@ -35,6 +35,9 @@ CTX = ssl.create_default_context()
 CTX.check_hostname = False
 CTX.verify_mode = ssl.CERT_NONE
 
+# 从环境变量中获取配置文件的url
+config_url = os.environ.get('CONFIG_URL')
+
 PATH = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -112,8 +115,6 @@ def get_cookie(text) -> str:
 
 
 def config_load(filename) -> dict:
-    # 从环境变量中获取配置文件的url
-    config_url = os.environ.get('SCKEY')
 
     # 通过url获取配置文件
     if config_url != "":
