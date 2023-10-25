@@ -13,12 +13,17 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: master
-
+          
+      - name: Install requiremants
+        run: pip install requests
+    
       - name: checkin
         uses: actions/setup-python@v2
         with:
           python-version: "3.x"
           architecture: "x64"
+        env:
+          CONFIG_URL: ${{secrests.CONFIG_URL}}
       - run: python ./.github/actions/checkin/universal.py
 
       - name: timestamp
