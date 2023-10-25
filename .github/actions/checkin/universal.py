@@ -13,6 +13,10 @@ import multiprocessing
 import os
 import ssl
 import json
+import subprocess
+# 使用 subprocess 调用命令来安装 requests 模块
+subprocess.check_call(["pip", "install", "requests"])
+
 import requests
 
 warnings.filterwarnings("ignore")
