@@ -92,26 +92,30 @@ def login(url, params, headers, retry) -> str:
         return ""
 
 
-def checkin(url, headers, retry) -> None:
+def checkin(url, headers, retry, email) -> None:
     try:
         request = urllib.request.Request(url, headers=headers, method="POST")
 
         response = urllib.request.urlopen(request, timeout=10, context=CTX)
         data = response.read().decode("unicode_escape")
+        # data = {"ret":0,"msg":"您似乎已经签到过了..."}
+        # 提取json中的msg字段
+        data = json.loads(data).get("msg", "")
         print(
             "[CheckInFinished] URL: {}\t\tResult:{}".format(extract_domain(url), data)
         )
         # 使用这个函数发送消息
-        send_msg("[CheckInFinished] URL: {}\t\tResult:{}".format(extract_domain(url), data))
+        send_msg("✅签到成功\n📧：{}\n🔗: {}\nℹ️：{}".format(email, extract_domain(url), data))
 
     except Exception as e:
         print(str(e))
         retry -= 1
 
         if retry > 0:
-            checkin(url, headers, retry)
+            checkin(url, headers, retry, email)
 
         print("[CheckInError] URL: {}".format(extract_domain(url)))
+        send_msg("🈲签到失败\n📧：{}\n🔗: {}".format(email, extract_domain(url)))
 
 
 def get_cookie(text) -> str:
@@ -159,7 +163,7 @@ def flow(domain, params, headers) -> bool:
     headers["referer"] = domain + "/user"
     headers["cookie"] = cookie
 
-    checkin(checkin_url, headers, 3)
+    checkin(checkin_url, headers, 3, params.get("email", ""))
     return True
 
 
