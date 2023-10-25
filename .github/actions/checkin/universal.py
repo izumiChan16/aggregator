@@ -14,6 +14,7 @@ import os
 import ssl
 import json
 import subprocess
+
 # 使用 subprocess 调用命令来安装 requests 模块
 subprocess.check_call(["pip", "install", "requests"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -38,12 +39,20 @@ CTX.verify_mode = ssl.CERT_NONE
 # 从环境变量中获取配置文件的url
 config_url = os.getenv('CONFIG_URL')
 
+TOKEN = os.getenv("BOT_TOKEN")  # 替换为你的 bot token
+CHAT_ID = os.getenv("CHAT_ID")  # 替换为你的 chat id
+
 PATH = os.path.abspath(os.path.dirname(__file__))
+
+
+def send_msg(text):
+    url_req = "https://api.telegram.org/bot" + TOKEN + "/sendMessage" + "?chat_id=" + CHAT_ID + "&text=" + text
+    results = requests.get(url_req)
 
 
 def extract_domain(url) -> str:
     if not url or not re.match(
-        "^(https?:\/\/(([a-zA-Z0-9]+-?)+\.)+[a-zA-Z]+)(:\d+)?(\/.*)?(\?.*)?(#.*)?$", url
+            "^(https?:\/\/(([a-zA-Z0-9]+-?)+\.)+[a-zA-Z]+)(:\d+)?(\/.*)?(\?.*)?(#.*)?$", url
     ):
         return ""
 
@@ -92,6 +101,8 @@ def checkin(url, headers, retry) -> None:
         print(
             "[CheckInFinished] URL: {}\t\tResult:{}".format(extract_domain(url), data)
         )
+        # 使用这个函数发送消息
+        send_msg("[CheckInFinished] URL: {}\t\tResult:{}".format(extract_domain(url), data))
 
     except Exception as e:
         print(str(e))
@@ -115,7 +126,6 @@ def get_cookie(text) -> str:
 
 
 def config_load(filename) -> dict:
-
     # 通过url获取配置文件
     if config_url != "":
         config = json.loads(requests.get(config_url).text)
