@@ -117,10 +117,12 @@ def config_load(filename) -> dict:
     # 从环境变量中获取配置文件的url
     if "CONFIG_URL" in os.environ:
         config_url = os.environ["CONFIG_URL"]
+        print(config_url)
 
     # 通过url获取配置文件
     if config_url:
         config = json.loads(requests.get(config_url).text)
+        print("成功获取配置文件")
     else:
         config = json.loads(open(filename, "r").read())
     return config
@@ -162,6 +164,11 @@ def wrapper(args) -> bool:
 def main() -> None:
     config = config_load(os.path.join(PATH, "config.json"))
     params = config.get("domains", [])
+    
+    # 如果params为空，则退出程序
+    if not params:
+        print("params is empty")
+        return
 
     cpu_count = multiprocessing.cpu_count()
     num = len(params) if len(params) <= cpu_count else cpu_count
