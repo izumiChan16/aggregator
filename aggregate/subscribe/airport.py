@@ -14,6 +14,7 @@ import traceback
 import urllib
 import urllib.parse
 import urllib.request
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -43,6 +44,9 @@ PATH = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
 # 重命名分隔符
 RENAME_SEPARATOR = "#@&#@"
+
+# 生成随机字符串时候选字符
+LETTERS = set(string.ascii_letters + string.digits)
 
 # 标记数字位数
 # SUFFIX_BITS = 2
@@ -173,7 +177,7 @@ class AirPort:
         params = {"email": email.strip()}
 
         data = urllib.parse.urlencode(params).encode(encoding="UTF8")
-        headers = self.headers
+        headers = deepcopy(self.headers)
         headers["Content-Type"] = "application/x-www-form-urlencoded"
 
         try:
@@ -206,7 +210,7 @@ class AirPort:
         }
 
         data = urllib.parse.urlencode(params).encode(encoding="UTF8")
-        headers = self.headers
+        headers = deepcopy(self.headers)
         headers["Content-Type"] = "application/x-www-form-urlencoded"
 
         try:
@@ -395,7 +399,7 @@ class AirPort:
 
                 # 如果标准正则无法提取验证码则直接匹配数字
                 mask = mailbox.extract_mask(message.text) or mailbox.extract_mask(
-                    message.text, "\s+([0-9]{6})"
+                    message.text, r"\s+([0-9]{6})"
                 )
                 mailbox.delete_account(account=account)
                 if not mask:
@@ -438,8 +442,12 @@ class AirPort:
             with open(self.sub, "r", encoding="UTF8") as f:
                 text = f.read()
         else:
+            headers = deepcopy(self.headers)
+            headers["Accept-Encoding"] = "gzip"
+
+            trace = os.environ.get("TRACE_ENABLE", "false").lower() in ["true", "1"]
             text = utils.http_get(
-                url=self.sub, headers=self.headers, retry=retry
+                url=self.sub, headers=headers, retry=retry, timeout=30, trace=trace
             ).strip()
 
             # count = 1
@@ -553,7 +561,7 @@ class AirPort:
                         item["chatgpt"] = detect
 
                     # 重命名带网址的节点
-                    regex = "(?:https?://)?(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z\u4e00-\u9fa5]{2,}"
+                    regex = r"(?:https?://)?(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z\u4e00-\u9fa5]{2,}"
                     name = re.sub(regex, "", name, flags=re.I)
                 except:
                     logger.error(
@@ -568,7 +576,7 @@ class AirPort:
                 ).strip()
 
                 name = (
-                    re.sub("\s+|\r", " ", name)
+                    re.sub(r"\s+|\r", " ", name)
                     .replace("_", "-")
                     .replace("+", "-")
                     .strip(r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """)
@@ -576,6 +584,13 @@ class AirPort:
                 name = re.sub(r"((\s+)?-(\s+)?)+", "-", name)
                 if not name:
                     name = f"{self.name[0]}{self.name[-1]}-{''.join(random.sample(string.ascii_uppercase, 3))}"
+
+                if len(name) > 30:
+                    i, j, k, n = 10, 4, 4, len(name)
+                    abbreviation = "".join(
+                        random.sample([x for x in name[i : n - j] if x in LETTERS], k)
+                    ).strip()
+                    name = f"{name[:i].strip()}-{abbreviation}-{name[-j:].strip()}"
 
                 item["name"] = name.upper()
 
@@ -610,7 +625,9 @@ class AirPort:
         if not text:
             return []
 
-        if utils.isb64encode(text):
+        if utils.isb64encode(text) or not re.search(
+            r"^proxies:([\s\r\n]+)?$", text, flags=re.MULTILINE
+        ):
             artifact = utils.trim(text=artifact)
             if not artifact:
                 artifact = utils.random_chars(length=6, punctuation=False)
@@ -618,9 +635,16 @@ class AirPort:
             v2ray_file = os.path.join(PATH, "subconverter", f"{artifact}.txt")
             clash_file = os.path.join(PATH, "subconverter", f"{artifact}.yaml")
 
-            with open(v2ray_file, "w+") as f:
-                f.write(text)
-                f.flush()
+            try:
+                with open(v2ray_file, "w+", encoding="UTF8") as f:
+                    f.write(text)
+                    f.flush()
+            except:
+                if os.path.exists(v2ray_file):
+                    os.remove(v2ray_file)
+
+                logger.error(f"save file fialed, artifact: {artifact}")
+                traceback.print_exc()
 
             generate_conf = os.path.join(PATH, "subconverter", "generate.ini")
             success = subconverter.generate_conf(
@@ -633,6 +657,7 @@ class AirPort:
             )
             if not success:
                 logger.error("cannot generate subconverter config file")
+                os.remove(v2ray_file)
                 return []
 
             time.sleep(random.random())
@@ -661,15 +686,12 @@ class AirPort:
             # 已经读取，可以删除
             os.remove(clash_file)
         else:
-            if re.search("proxies:", text):
-                try:
-                    proxies = yaml.load(text, Loader=yaml.SafeLoader).get("proxies", [])
-                except yaml.constructor.ConstructorError:
-                    yaml.add_multi_constructor(
-                        "str", lambda loader, suffix, node: None, Loader=yaml.SafeLoader
-                    )
-                    proxies = yaml.load(text, Loader=yaml.FullLoader).get("proxies", [])
+            try:
+                nodes = yaml.load(text, Loader=yaml.SafeLoader).get("proxies", [])
+            except yaml.constructor.ConstructorError:
+                yaml.add_multi_constructor(
+                    "str", lambda loader, suffix, node: None, Loader=yaml.SafeLoader
+                )
+                nodes = yaml.load(text, Loader=yaml.FullLoader).get("proxies", [])
 
-                nodes = [x for x in proxies if verify(x)]
-
-        return nodes
+        return [x for x in nodes if verify(x)]

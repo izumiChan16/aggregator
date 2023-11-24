@@ -182,14 +182,19 @@ def batch_crawl(conf: dict, thread: int = 50) -> list:
             # Scripts
             scripts = conf.get("scripts", {})
             if scripts:
-                datasets = batch_call(scripts)
-                if datasets:
-                    for item in datasets:
-                        if not item or type(item) != dict or item.pop("saved", False):
+                items = batch_call(scripts)
+                if items:
+                    for item in items:
+                        if not item or type(item) != dict:
+                            continue
+
+                        if item.pop("saved", False):
+                            datasets.append(item)
                             continue
 
                         task = deepcopy(item)
                         subs = task.pop("sub", None)
+                        checked = task.pop("checked", True)
                         if type(subs) not in [str, list]:
                             continue
                         if type(subs) == str:
@@ -197,8 +202,12 @@ def batch_crawl(conf: dict, thread: int = 50) -> list:
                         for sub in subs:
                             if utils.isblank(sub):
                                 continue
-                            remark(source=task, defeat=0, discovered=True)
-                            peristedtasks[sub] = task
+
+                            if checked:
+                                remark(source=task, defeat=0, discovered=True)
+                                peristedtasks[sub] = task
+                            else:
+                                records.update({sub: task})
 
         # Remain
         if should_persist:
@@ -507,10 +516,10 @@ def crawl_google(
         params["start"] = start
         content = re.sub(r"\\\\n", "", utils.http_get(url=url, params=params))
         content = re.sub(r"\?token\\\\u003d", "?token=", content, flags=re.I)
-        regex = 'https?://(?:[a-zA-Z0-9_\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9_\u4e00-\u9fa5\-]+/?(?:<em(?:\s+)?class="qkunPe">/?)?api/v1/client/subscribe\?token(?:</em>)?=[a-zA-Z0-9]{16,32}'
+        regex = r'https?://(?:[a-zA-Z0-9_\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9_\u4e00-\u9fa5\-]+/?(?:<em(?:\s+)?class="qkunPe">/?)?api/v1/client/subscribe\?token(?:</em>)?=[a-zA-Z0-9]{16,32}'
         subscribes = re.findall(regex, content)
         for s in subscribes:
-            s = re.sub('<em(?:\s+)?class="qkunPe">|</em>|\s+', "", s).replace(
+            s = re.sub(r'<em(?:\s+)?class="qkunPe">|</em>|\s+', "", s).replace(
                 "http://", "https://", 1
             )
             try:
@@ -586,7 +595,7 @@ def search_github_issues(page: int, cookie: str) -> list:
         return []
 
     try:
-        regex = 'href="(/.*/.*/issues/\d+)">'
+        regex = r'href="(/.*/.*/issues/\d+)">'
         groups = re.findall(regex, content, flags=re.I)
         links = list(set(groups))
         links = [f"https://github.com{x}" for x in links]
@@ -663,7 +672,7 @@ def search_github_code(page: int, cookie: str, excludes: list = []) -> list:
         return []
 
     try:
-        regex = '<a href="(/\S+/blob/.*?)#L\d+"'
+        regex = r'<a href="(/\S+/blob/.*?)#L\d+"'
         groups = re.findall(regex, content, flags=re.I)
         uris, links = list(set(groups)) if groups else [], set()
         excludes = list(set(excludes))
@@ -1009,9 +1018,11 @@ def extract_subscribes(
         return {}
     try:
         limits, collections, proxies = max(1, limits), {}, []
-        sub_regex = "https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+(?:(?:(?:/index.php)?/api/v1/client/subscribe\?token=[a-zA-Z0-9]{16,32})|(?:/link/[a-zA-Z0-9]+\?(?:sub|mu|clash)=\d))"
-        extra_regex = "https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+/sub\?(?:\S+)?target=\S+"
-        protocal_regex = "(?:vmess|trojan|ss|ssr|snell)://[a-zA-Z0-9:.?+=@%&#_\-/]{10,}"
+        sub_regex = r"https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+(?:(?:(?:/index.php)?/api/v1/client/subscribe\?token=[a-zA-Z0-9]{16,32})|(?:/link/[a-zA-Z0-9]+\?(?:sub|mu|clash)=\d))"
+        extra_regex = r"https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+/sub\?(?:\S+)?target=\S+"
+        protocal_regex = (
+            r"(?:vmess|trojan|ss|ssr|snell)://[a-zA-Z0-9:.?+=@%&#_\-/]{10,}"
+        )
 
         regex = f"{sub_regex}|{extra_regex}"
 
@@ -1069,7 +1080,7 @@ def extract_subscribes(
             for s in items:
                 try:
                     if include and not re.match(
-                        "https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+.*",
+                        r"https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+.*",
                         s,
                     ):
                         continue
@@ -1207,7 +1218,7 @@ def check_status(
         return False, CONNECTABLE
 
     try:
-        headers = {"User-Agent": "ClashforWindows"}
+        headers = {"User-Agent": "clash.meta"}
         request = urllib.request.Request(url=url, headers=headers)
         response = urllib.request.urlopen(request, timeout=10, context=utils.CTX)
         if response.getcode() != 200:
@@ -1334,7 +1345,7 @@ def get_telegram_pages(channel: str) -> int:
     content = utils.http_get(url=url)
     before = 0
     try:
-        regex = f'<link\s+rel="canonical"\s+href="/s/{channel}\?before=(\d+)">'
+        regex = rf'<link\s+rel="canonical"\s+href="/s/{channel}\?before=(\d+)">'
         groups = re.findall(regex, content)
         before = int(groups[0]) if groups else before
     except:
@@ -1354,7 +1365,7 @@ def extract_airport_site(url: str) -> list:
         logger.error(f"[CrawlError] cannot any content from url: {url}")
         return []
     try:
-        regex = 'href="(https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+/?)"\s+target="_blank"\s+rel="noopener">'
+        regex = r'href="(https?://(?:[a-zA-Z0-9\u4e00-\u9fa5\-]+\.)+[a-zA-Z0-9\u4e00-\u9fa5\-]+/?)"\s+target="_blank"\s+rel="noopener">'
         groups = re.findall(regex, content)
         return list(set(groups)) if groups else []
     except:

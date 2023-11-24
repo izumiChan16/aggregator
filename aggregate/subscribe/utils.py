@@ -14,13 +14,13 @@ import string
 import subprocess
 import sys
 import time
+import traceback
 import typing
 import urllib
 import urllib.parse
 import urllib.request
 import uuid
 from http.client import HTTPMessage, HTTPResponse
-from urllib import parse
 
 from logger import logger
 from urlvalidator import isurl
@@ -67,6 +67,8 @@ def http_get(
     retry: int = 3,
     proxy: str = "",
     interval: float = 0,
+    timeout: float = 10,
+    trace: bool = False,
 ) -> str:
     if not isurl(url=url):
         logger.error(f"invalid url: {url}")
@@ -79,6 +81,7 @@ def http_get(
     headers = DEFAULT_HTTP_HEADERS if not headers else headers
 
     interval = max(0, interval)
+    timeout = max(1, timeout)
     try:
         url = encoding_url(url=url)
         if params and isinstance(params, dict):
@@ -97,7 +100,7 @@ def http_get(
                 host, protocal = proxy[7:], "http"
             request.set_proxy(host=host, type=protocal)
 
-        response = urllib.request.urlopen(request, timeout=10, context=CTX)
+        response = urllib.request.urlopen(request, timeout=timeout, context=CTX)
         content = response.read()
         status_code = response.getcode()
         try:
@@ -105,35 +108,29 @@ def http_get(
         except:
             content = gzip.decompress(content).decode("utf8")
         if status_code != 200:
-            logger.debug(
-                f"request failed, status code: {status_code}\t message: {content}"
-            )
+            if trace:
+                logger.error(
+                    f"request failed, url: {hide(url)}, code: {status_code}, message: {content}"
+                )
+
             return ""
 
         return content
-    except urllib.error.HTTPError as e:
-        logger.debug(f"request failed, url=[{hide(url=url)}], code: {e.code}")
-        try:
-            message = str(e.read(), encoding="utf8")
-        except UnicodeDecodeError:
-            message = str(e.read(), encoding="utf8")
-        if e.code == 503 and "token" not in message:
-            time.sleep(interval)
-            return http_get(
-                url=url,
-                headers=headers,
-                params=params,
-                retry=retry - 1,
-                proxy=proxy,
-                interval=interval,
-            )
-        return ""
-    except (urllib.error.URLError, TimeoutError) as e:
-        message = "timeout" if isinstance(e, TimeoutError) else e.reason
-        logger.debug(f"request failed, url=[{hide(url=url)}], message: {message}")
-        return ""
     except Exception as e:
-        logger.debug(e)
+        if trace:
+            logger.error(
+                f"request failed, url: {hide(url)}, message: \n{traceback.format_exc()}"
+            )
+
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                message = str(e.read(), encoding="utf8")
+            except UnicodeDecodeError:
+                message = "unknown error"
+
+            if e.code != 503 or "token" in message:
+                return ""
+
         time.sleep(interval)
         return http_get(
             url=url,
@@ -142,6 +139,7 @@ def http_get(
             retry=retry - 1,
             proxy=proxy,
             interval=interval,
+            timeout=timeout,
         )
 
 
@@ -303,9 +301,9 @@ def parse_token(url: str) -> str:
     if not isurl(url):
         return ""
 
-    result = parse.urlparse(url=url)
+    result = urllib.parse.urlparse(url=url)
     if result.query:
-        params = {k: v[0] for k, v in parse.parse_qs(result.query).items()}
+        params = {k: v[0] for k, v in urllib.parse.parse_qs(result.query).items()}
         if "token" in params:
             return params.get("token", "")
 
@@ -322,12 +320,12 @@ def mask(url: str) -> str:
             token = "".join(re.findall("token=([a-zA-Z0-9]+)", parse_result.query))
             if len(token) >= 6:
                 token = token[:3] + "***" + token[-3:]
-            url = f"{parse_result.scheme}://{parse_result.netloc}/{parse_result.path}?token={token}"
+            url = f"{parse_result.scheme}://{parse_result.netloc}{parse_result.path}?token={token}"
         else:
             path, token = parse_result.path.rsplit("/", maxsplit=1)
             if len(token) >= 6:
                 token = token[:3] + "***" + token[-3:]
-            url = f"{parse_result.scheme}://{parse_result.netloc}/{path}/{token}"
+            url = f"{parse_result.scheme}://{parse_result.netloc}{path}/{token}"
     except:
         logger.error(f"invalid url: {url}")
 
@@ -401,3 +399,17 @@ def is_number(num: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def url_complete(url: str) -> str:
+    if isblank(url):
+        return ""
+
+    if not url.startswith("https://"):
+        # force use https protocol
+        if url.startswith("http://"):
+            url = url.replace("http://", "https://")
+        else:
+            url = f"https://{url}"
+
+    return url
