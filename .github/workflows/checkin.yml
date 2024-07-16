@@ -2,7 +2,7 @@ name: checkin
 on:
   workflow_dispatch:
   schedule:
-    - cron: "45 02 * * *"
+    - cron: "45 22 * * *"
 
 jobs:
   sync_with_upstream:
